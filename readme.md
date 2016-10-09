@@ -5,7 +5,7 @@ https://github.com/charlierguo/gmail
 https://github.com/jinglemansweep/PyLMS
 
 ## Usage
-python start.py -u username@gmail.com -s squeezeserver.hostname
+python start.py -u username@gmail.com -s squeezeserver.hostname -p squeezeplayername
 
 ## Details
 Uses gmail library to poll for new messages.
