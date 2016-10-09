@@ -11,6 +11,7 @@ _services = {
     'soundcloud': ['https://soundcloud\.com/\w+/[\w-]+', 'soundcloud://', 'soundcloud:tracks:(\d+)'],
     'spotify': ['https://open\.spotify\.com/track/(\w+)', 'spotify:track:'],
     'youtube': ['https://youtu\.be/(\w+)', 'youtube://www.youtube.com/v/']}
+_lms_autoplay = True
 
 
 def main(argv):
@@ -45,6 +46,10 @@ def main(argv):
         print '\n%s' % time.ctime()
         uris = process_unread_emails(username, password)
         add_to_playlist(sp, uris)
+        if _lms_autoplay and len(uris) > 0 and sp.get_mode() == 'stop':
+            print 'Stopped player detected, advancing to next track and playing'
+            sp.next()
+            sp.play()
         print 'Will refresh in %s seconds' % _refresh_seconds
         time.sleep(_refresh_seconds)
 
