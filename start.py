@@ -1,13 +1,16 @@
 #!/bin/python
 
-import getopt, getpass, gmail, re, signal, sys, time
+import getopt, getpass, gmail, re, signal, sys, urllib2, time
 from pylms.server import Server
 from pylms.player import Player
 
 _example = 'start.py -u someuser@gmail.com -s squeezeserver.host'
-_refresh_seconds = 10
-_services = {'spotify': ['https://open.spotify.com/track/(\w+)', 'spotify:track:'],
-             'youtube': ['https://youtu.be/(\w+)', 'youtube://www.youtube.com/v/']}
+_refresh_seconds = 60
+_services = {
+    'bandcamp': ['https://\w+\.bandcamp\.com/track/[\w-]+', 'http:', '"(//\w+\.bandcamp\.com/download/track[^"]+)"'],
+    'soundcloud': ['https://soundcloud\.com/\w+/[\w-]+', 'soundcloud://', 'soundcloud:tracks:(\d+)'],
+    'spotify': ['https://open\.spotify\.com/track/(\w+)', 'spotify:track:'],
+    'youtube': ['https://youtu\.be/(\w+)', 'youtube://www.youtube.com/v/']}
 
 
 def main(argv):
@@ -15,7 +18,7 @@ def main(argv):
     server = ''
     player = ''
     try:
-        opts, args = getopt.getopt(argv, 'hu:s:p:', ['help', 'username=', 'server=', 'player='])
+        opts, args = getopt.getopt(argv, 'hu:s:p:r:', ['help', 'username=', 'server=', 'player=', 'refresh='])
     except getopt.GetoptError:
         print _example
         sys.exit(2)
@@ -29,14 +32,20 @@ def main(argv):
             server = arg
         elif opt in ('-p', '--player'):
             player = arg
+        elif opt in ('-r', '--refresh'):
+            global _refresh_seconds
+            _refresh_seconds = int(arg)
     # Main loop
-    print 'Starting Gmail 2 LMS Bridge username: ' + username + ' server: ' + server
-    password = getpass.getpass()
+    print 'Starting Gmail 2 LMS Bridge\nusername[%s] server[%s] player[%s] refresh[%ds]' % (
+        username, server, player, _refresh_seconds)
+
+    password = getpass.getpass('Gmail Password:')
     sp = get_squeeze_player(server, player)
     while True:
+        print '\n%s' % time.ctime()
         uris = process_unread_emails(username, password)
         add_to_playlist(sp, uris)
-        print 'Sleeping %s seconds' % _refresh_seconds
+        print 'Will refresh in %s seconds' % _refresh_seconds
         time.sleep(_refresh_seconds)
 
 
@@ -56,7 +65,7 @@ def process_unread_emails(username, password):
         uri = parse_supported_uri(email.body)
         if uri is not None:
             uris.append(uri)
-            print 'Found URI\nFrom[%s]\nSent at[%s]\nSubject[%s]\nURI[%s]' % (
+            print '\nFrom[%s]\nSent at[%s]\nSubject[%s]\nURI[%s]\n' % (
                 email.fr, email.sent_at, email.subject, uri)
         email.read()
     g.logout()
@@ -67,15 +76,21 @@ def parse_supported_uri(text):
     for k, v in _services.items():
         match = re.search(v[0], text)
         if match is not None:
-            return v[1] + match.group(1)
+            if k in ('bandcamp', 'soundcloud'):
+                print 'Looking up API id for [%s]' % match.group(0)
+                html = urllib2.urlopen(match.group(0)).read()
+                match = re.search(v[2], html)
+                if match is not None:
+                    return v[1] + match.group(1)
+            else:
+                return v[1] + match.group(1)
 
 
 def add_to_playlist(sp, uris):
-    print 'Adding uris to current playlist'
     if len(uris) == 0:
         return
+    print 'Adding [%d] URIs to current playlist' % len(uris)
     for uri in uris:
-        print uri
         sp.playlist_add(uri)
 
 
